@@ -837,6 +837,7 @@ pytest
 **ผลลัพธ์ที่คาดหวัง**:
 - Tests ทั้งหมดผ่าน (สีเขียว)
 - Code coverage อย่างน้อย 90%
+- 
   
 ## *** ผลการทดสอบระบบมี % ยังไม่สูง ต้องแก้ไขให้ทดสอบครอบคลุมอย่างน้อย 90% แก้ไขดังนี้***
 
@@ -1382,13 +1383,22 @@ start htmlcov/index.html  # Windows
 ## แนบรูปผลการทดลองการทดสอบระบบ
 ```plaintext
 # แนบรูปผลการทดลองที่นี่
+<img width="1292" height="641" alt="Screenshot 2568-10-31 at 11 11 20" src="https://github.com/user-attachments/assets/c2ecb968-9312-497d-91e7-8648b98fa560" />
 
 ``` 
 ## คำถามการทดลอง
 ให้จับคู่ Code ส่วนของการทดสอบ กับ Code การทำงาน มาอย่างน้อย 3 ฟังก์ชัน พร้อมอธิบายการทำงานของแต่ละกรณี
-```plaintext
-# ตอบคำถามที่นี่
-
+```plaintextupdate_todo(todo_id)
+1. test_update_todo_database_error()
+ใช้ PATCH เพื่อจำลองกรณีฐานข้อมูลมีปัญหาระหว่าง db.session.commit() → mock ให้เกิด SQLAlchemyError('Database error') แล้วตรวจว่า API ตอบกลับ 500 และ success=False
+2. delete_todo(todo_id)
+test_delete_todo() และ test_delete_todo_database_error()
+<u>กรณีปกติ:</u> สร้าง Todo ก่อน แล้วส่ง DELETE /api/todos/<id> ตรวจว่า status=200 และ success=True จากนั้น GET ซ้ำต้อง 404
+<u>กรณีผิดพลาด:</u> mock ให้ db.session.delete() หรือ commit() โยน SQLAlchemyError → API ต้องคืนค่า 500 และ success=False
+3. get_all_todos()
+test_get_all_todos_ordered() และ test_get_todos_database_error()
+<u>กรณีปกติ:</u> เพิ่ม Todo 3 รายการ แล้วเรียก GET /api/todos ต้องเรียงจากใหม่ไปเก่า (created_at desc)
+<u>กรณีผิดพลาด:</u> mock ให้ Todo.query.order_by().all() ขัดข้อง → ต้องได้ status=500 และ success=False
 
 ```
 
@@ -1731,7 +1741,8 @@ https://flask-todo-app.onrender.com
 **ทำการ push ไปที่ GitHub Repository** แล้วตรวจสอบผลการทำงาน
 ## บันทึกรูปผลการทำงาน
 ```bash
-# บันทึกรูปผลการทำงานที่นี่
+<img width="1920" height="1200" alt="Screenshot 2568-10-31 at 11 35 13" src="https://github.com/user-attachments/assets/4cbfa980-46da-46ed-b803-cffb65ca39b9" />
+
 ``` 
 
 ---
@@ -2140,16 +2151,31 @@ docker-compose up -d
 ### 10.2 คำถามทบทวน
 
 
-1. **Docker Architecture**:
-   - เหตุใดจึงต้องแยก database และ application เป็นคนละ containers ?
-   - Multi-stage build มีประโยชน์อย่างไร?
+1. **Docker Architecture**:| เหตุผล
+เราจำเป็นต้องแยก database และ application ออกเป็นคนละ container เพราะหลักการของ Docker คือให้แต่ละ container ทำหน้าที่เฉพาะอย่างเดียว (Single Responsibility)
+หากเราแยกออกจากกัน เราจะได้ประโยชน์หลายด้าน เช่น
+ความเสถียร (Isolation): ถ้า database พังหรือ restart จะไม่กระทบกับแอปพลิเคชันโดยตรง
+การขยายระบบ (Scalability): สามารถเพิ่มจำนวน container ของแอปได้โดยไม่ต้องยุ่งกับฐานข้อมูล
+การดูแลและอัปเดตง่าย (Maintainability): สามารถอัปเดตแอปได้โดยไม่ต้องแตะต้องฐานข้อมูล
+ความปลอดภัย (Security): จำกัดให้ database เข้าถึงได้เฉพาะใน network ภายใน Docker เท่านั้น
 
 2. **Testing Strategy**:
-   - การวัด code coverage มีความสำคัญอย่างไร?
+   Multi-stage build คือเทคนิคใน Dockerfile ที่แยก “ขั้นตอนการ build” ออกจาก “ขั้นตอนการ run” ของแอปพลิเคชัน
+เช่น เราอาจใช้ image หนึ่งในการติดตั้ง dependencies และ compile จากนั้นคัดเฉพาะไฟล์ที่จำเป็นไปไว้ใน image ที่เล็กและสะอาดกว่าเพื่อใช้รันจริง
+ข้อดีของการทำแบบนี้คือ
+ได้ image ขนาดเล็กลงมาก เพราะไม่มีเครื่องมือหรือไฟล์ build ที่ไม่จำเป็น
+ปลอดภัยขึ้น เพราะไม่มีโค้ดหรือเครื่องมือภายในที่เสี่ยง
+build ได้เร็วขึ้น เพราะ Docker cache แต่ละขั้นตอนแยกจากกัน
+ดูแลได้ง่าย เพราะเห็นชัดเจนว่าแต่ละขั้นตอนทำหน้าที่อะไร
 
 3. **Deployment**:
    - Health check endpoint มีความสำคัญอย่างไร?
    - Render และ Railway มีความแตกต่างกันอย่่างไร?
+   - Health check endpoint เช่น /health หรือ /ping มีไว้ตรวจสอบว่าแอปยังทำงานปกติหรือไม่ หากไม่ตอบ ระบบอย่าง Docker, Kubernetes, Render หรือ Railway จะรู้ว่าควร รีสตาร์ตคอนเทนเนอร์หรือหยุดส่งทราฟฟิก มายัง instance นั้น เพื่อรักษาเสถียรภาพของระบบ
+นอกจากนี้ เครื่องมือ monitoring เช่น Prometheus หรือ UptimeRobot ยังใช้ endpoint นี้ในการแจ้งเตือนเมื่อระบบล่ม
+ส่วน Render และ Railway เป็นบริการคลาวด์ที่ช่วยให้ deploy แอปได้ง่ายโดยไม่ต้องจัดการเซิร์ฟเวอร์เอง
+Render: เหมาะกับระบบ production จริง มีความเสถียรสูง และมีระบบจัดการทราฟฟิกกับฐานข้อมูลในตัว คล้าย Heroku
+Railway: เหมาะกับการพัฒนา ทดลอง หรือเดโม เพราะตั้งค่าเร็ว ใช้งานง่าย และจำลองสภาพแวดล้อม local บนคลาวด์ได้สะดวก
 
 
 ---
